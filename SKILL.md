@@ -1,5 +1,9 @@
 # SKILL: SheetORM
 
+- **Repository:** https://github.com/Kittisayst/SheetORM
+- **Platform:** Google Apps Script Library
+- **Docs:** See `README.md` for full reference, `SKILL.md` for quick reference
+
 ## Overview
 SheetORM is a Google Apps Script library that wraps Google Sheets as a database with ORM-style API.
 - Each **Sheet tab** = a table

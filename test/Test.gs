@@ -29,7 +29,11 @@ function runAllTests() {
     testMigrationStatus,
     testRollback,
     testSeed,
-    testFreshSeed
+    testFreshSeed,
+    testOrderByEmptyTable,
+    testOrderBySingleRow,
+    testLimitOnEmptyTable,
+    testSelectDirectOnTable
   ];
 
   tests.forEach(function (fn) {
@@ -468,4 +472,40 @@ function testFreshSeed() {
 
   var all = getTable().findAll();
   assertEqual(all.data.length, 2, "freshSeed re-inserted 2 rows");
+}
+
+// ===============================
+// 8. Regression — Bug #1
+//    table.orderBy/limit/select ໂດຍບໍ່ໄດ້ where() ກ່ອນ
+// ===============================
+
+function testOrderByEmptyTable() {
+  clearTable();
+  var result = getTable().orderBy("name", "ASC").get();
+  assert(result.success, "orderBy on empty table should succeed");
+  assertEqual(result.data.length, 0, "empty table returns []");
+}
+
+function testOrderBySingleRow() {
+  clearTable();
+  getTable().insert({ name: "Kitti", role: "admin", email: "kitti@test.com" });
+  var result = getTable().orderBy("name", "ASC").get();
+  assert(result.success, "orderBy on 1-row table should succeed");
+  assertEqual(result.data.length, 1, "single row returned");
+}
+
+function testLimitOnEmptyTable() {
+  clearTable();
+  var result = getTable().limit(5).get();
+  assert(result.success, "limit on empty table should succeed");
+  assertEqual(result.data.length, 0, "empty table with limit returns []");
+}
+
+function testSelectDirectOnTable() {
+  clearTable();
+  getTable().insert({ name: "Kitti", role: "admin", email: "kitti@test.com" });
+  var result = getTable().select(["id", "name"]).get();
+  assert(result.success, "select directly on table should succeed");
+  assert(result.data[0].name, "name present");
+  assert(!result.data[0].email, "email excluded");
 }

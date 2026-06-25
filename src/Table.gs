@@ -157,9 +157,25 @@ Table.prototype.delete = function (id) {
   }
 };
 
-// --- WHERE: entry point for Query builder ---
+// --- Query builder entry points ---
 Table.prototype.where = function (field, op, value) {
   return new Query(this).where(field, op, value);
+};
+
+Table.prototype.orderBy = function (field, dir) {
+  return new Query(this).orderBy(field, dir);
+};
+
+Table.prototype.limit = function (n) {
+  return new Query(this).limit(n);
+};
+
+Table.prototype.offset = function (n) {
+  return new Query(this).offset(n);
+};
+
+Table.prototype.select = function (fields) {
+  return new Query(this).select(fields);
 };
 
 // --- INSERT MANY: batch insert using setValues (faster than appendRow loop) ---
