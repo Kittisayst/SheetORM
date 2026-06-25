@@ -12,10 +12,88 @@ SheetORM is a Google Apps Script library that wraps Google Sheets as a database 
 
 ---
 
-## Setup
+## Setup in Consumer Project
+
+### 1. ຕັ້ງຄ່າ `appsscript.json`
+
+ໃນ project ທີ່ຢາກໃຊ້ SheetORM ໃຫ້ເພີ່ມ library entry ເຂົ້າໃນ `appsscript.json`:
+
+```json
+{
+  "timeZone": "Asia/Vientiane",
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "SheetORM",
+        "libraryId": "SHEETORM_SCRIPT_ID",
+        "version": "2",
+        "developmentMode": false
+      }
+    ]
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "ANYONE_ANONYMOUS"
+  }
+}
+```
+
+> - `userSymbol` ຕ້ອງເປັນ `"SheetORM"` — ຈຶ່ງໃຊ້ `SheetORM.connect()` ໄດ້
+> - `libraryId` = Script ID ຂອງ SheetORM project (ຫາໄດ້ຈາກ Project Settings ⚙️)
+> - `developmentMode: true` = ໃຊ້ HEAD version (ສຳລັບ dev), `false` = ໃຊ້ version ທີ່ລະບຸ
+
+### 2. ຕັ້ງຄ່າ `.clasp.json` ສຳລັບ push code
+
+ສ້າງ `.clasp.json` ທີ່ root ຂອງ consumer project:
+
+```json
+{
+  "scriptId": "YOUR_PROJECT_SCRIPT_ID",
+  "rootDir": "src"
+}
+```
+
+> - `scriptId` = Script ID ຂອງ **project ຕົນເອງ** (ບໍ່ແມ່ນ SheetORM)
+> - `rootDir` = folder ທີ່ມີ `.gs` files ແລະ `appsscript.json`
+> - ຮັນ `clasp push` ຈາກ root ໄດ້ເລີຍ — clasp ຈະ push ສະເພາະໄຟລ໌ໃນ `rootDir`
+
+```bash
+clasp push         # push ໄຟລ໌ທັງໝົດ
+clasp push --force # force push (ຖ້າ skip)
+clasp pull         # pull ໄຟລ໌ຈາກ Apps Script ລົງ local
+```
+
+### 3. ໃຊ້ SheetORM ໂດຍກົງ — ບໍ່ຕ້ອງ copy code
 
 ```javascript
-// Add library via Script ID, Identifier = "SheetORM"
+// ✅ ໃຊ້ SheetORM ຜ່ານ library identifier ໄດ້ເລີຍ
+const db    = SheetORM.connect("SPREADSHEET_ID");
+const users = db.table("users");
+
+// ❌ ບໍ່ຕ້ອງ copy/paste code ຈາກ SheetORM repo
+// ❌ ບໍ່ຕ້ອງ import Table.gs, Query.gs ໃສ່ project ຕົນເອງ
+```
+
+### ໂຄງສ້າງ project ທີ່ໃຊ້ SheetORM
+
+```
+my-backend/
+├── .clasp.json          ← scriptId ຂອງ project ຕົນເອງ, rootDir: "src"
+└── src/
+    ├── appsscript.json  ← ມີ SheetORM ໃນ dependencies.libraries
+    ├── Code.gs          ← doGet / doPost handler
+    ├── Users.gs         ← user-specific logic
+    └── ...
+```
+
+---
+
+## Usage
+
+```javascript
+// ໃຊ້ SheetORM ໃນ src/Code.gs ຫຼື src/*.gs ໃດກໍໄດ້
 const db    = SheetORM.connect("SPREADSHEET_ID");
 const users = db.table("users");           // basic
 const users = db.table("users").schema({}); // with validation
