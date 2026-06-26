@@ -45,10 +45,10 @@ Query.prototype._match = function (record) {
     switch (c.op) {
       case "=":          return val === cval;
       case "!=":         return val !== cval;
-      case ">":          return parseFloat(val) > parseFloat(cval);
-      case "<":          return parseFloat(val) < parseFloat(cval);
-      case ">=":         return parseFloat(val) >= parseFloat(cval);
-      case "<=":         return parseFloat(val) <= parseFloat(cval);
+      case ">":          return _coerce(val) > _coerce(cval);
+      case "<":          return _coerce(val) < _coerce(cval);
+      case ">=":         return _coerce(val) >= _coerce(cval);
+      case "<=":         return _coerce(val) <= _coerce(cval);
       case "contains":   return val.indexOf(cval) !== -1;
       case "startsWith": return val.indexOf(cval) === 0;
       case "endsWith":   return val.slice(-cval.length) === cval;
@@ -56,6 +56,17 @@ Query.prototype._match = function (record) {
     }
   });
 };
+
+// coerce value to number for comparison:
+// - pure number string → number
+// - ISO date string    → timestamp (ms)
+// - else              → NaN
+function _coerce(s) {
+  var n = Number(s);
+  if (!isNaN(n)) return n;
+  var d = new Date(s);
+  return isNaN(d.getTime()) ? NaN : d.getTime();
+}
 
 // --- GET: execute query, return filtered/sorted/paged results ---
 
@@ -73,8 +84,10 @@ Query.prototype.get = function () {
       var dir = this._orderDir;
       results.sort(function (a, b) {
         var av = a[field], bv = b[field];
-        var an = parseFloat(av), bn = parseFloat(bv);
+        // numeric / ISO-date path
+        var an = _coerce(av), bn = _coerce(bv);
         if (!isNaN(an) && !isNaN(bn)) return dir === "ASC" ? an - bn : bn - an;
+        // string fallback (also works for ISO dates lexicographically)
         var as = String(av), bs = String(bv);
         if (as < bs) return dir === "ASC" ? -1 : 1;
         if (as > bs) return dir === "ASC" ? 1 : -1;

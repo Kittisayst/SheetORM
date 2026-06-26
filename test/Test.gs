@@ -33,7 +33,9 @@ function runAllTests() {
     testOrderByEmptyTable,
     testOrderBySingleRow,
     testLimitOnEmptyTable,
-    testSelectDirectOnTable
+    testSelectDirectOnTable,
+    testOrderByIsoDate,
+    testWhereIsoDateRange
   ];
 
   tests.forEach(function (fn) {
@@ -508,4 +510,42 @@ function testSelectDirectOnTable() {
   assert(result.success, "select directly on table should succeed");
   assert(result.data[0].name, "name present");
   assert(!result.data[0].email, "email excluded");
+}
+
+// ===============================
+// 9. Regression — ISO date orderBy / where
+// ===============================
+
+function testOrderByIsoDate() {
+  clearTable();
+  var users = getTable();
+  // insert ດ້ວຍ createdAt ທີ່ຕ່າງກັນ
+  users.insert({ name: "Old",    role: "user", email: "old@test.com",    createdAt: "2026-06-24T08:00:00.000Z" });
+  users.insert({ name: "Middle", role: "user", email: "middle@test.com", createdAt: "2026-06-25T08:32:39.953Z" });
+  users.insert({ name: "New",    role: "user", email: "new@test.com",    createdAt: "2026-06-26T03:38:10.355Z" });
+
+  var asc  = users.orderBy("createdAt", "ASC").get();
+  var desc = users.orderBy("createdAt", "DESC").get();
+
+  assert(asc.success,  "orderBy ISO date ASC should succeed");
+  assert(desc.success, "orderBy ISO date DESC should succeed");
+
+  assertEqual(asc.data[0].name,  "Old", "ASC first = oldest");
+  assertEqual(asc.data[2].name,  "New", "ASC last  = newest");
+  assertEqual(desc.data[0].name, "New", "DESC first = newest");
+  assertEqual(desc.data[2].name, "Old", "DESC last  = oldest");
+}
+
+function testWhereIsoDateRange() {
+  clearTable();
+  var users = getTable();
+  users.insert({ name: "Old",    role: "user", email: "old@test.com",    createdAt: "2026-06-24T00:00:00.000Z" });
+  users.insert({ name: "Middle", role: "user", email: "middle@test.com", createdAt: "2026-06-25T08:32:39.953Z" });
+  users.insert({ name: "New",    role: "user", email: "new@test.com",    createdAt: "2026-06-26T03:38:10.355Z" });
+
+  // ດຶງ records ທີ່ createdAt > 2026-06-24
+  var result = users.where("createdAt", ">", "2026-06-24T23:59:59.999Z").get();
+  assert(result.success, "where ISO date > should succeed");
+  assertEqual(result.data.length, 2, "should return 2 records after 2026-06-24");
+  assert(result.data.every(function(r) { return r.name !== "Old"; }), "Old should be excluded");
 }
