@@ -63,6 +63,16 @@ const db    = SheetORM.connect("SPREADSHEET_ID");
 const users = db.table("users");  // ຊື່ sheet tab
 ```
 
+### whoAmI — ກວດບັນຊີທີ່ script ກໍາລັງ execute ຢູ່
+
+ໃຊ້ debug ຕອນ `connect()`/`driveConnect()` ລົ້ມເຫຼວ ແບບບໍ່ຮູ້ສາເຫດ (ໂດຍສະເພາະບັນຫາບັນຊີບໍ່ກົງກັນລະຫວ່າງ
+account ທີ່ deploy ກັບ account ທີ່ເປັນເຈົ້າຂອງ spreadsheet/folder):
+
+```javascript
+SheetORM.whoAmI();
+// → "someone@example.com"
+```
+
 ---
 
 ## Schema & Validation
@@ -357,7 +367,13 @@ drive.insert({ blob: someBlob, name: "report.pdf", description: "Monthly report"
 // ສ້າງ subfolder: ບໍ່ມີ blob, ມີ name
 drive.insert({ name: "2026-06" });
 // → { success: true, data: { id, name: "2026-06", type: "folder", ... } }
+
+// ຮູບພາບທີ່ຢາກເປັນ public (ໃຊ້ໃນ landing page ສາທາລະນະ)
+drive.insert({ blob: imageBlob, name: "room.jpg", sharing: "public" });
 ```
+
+> `sharing: "public"` ຕັ້ງ `ANYONE` + `VIEW` (ຜ່ານ `setSharing()`) — ໃຊ້ໄດ້ທັງກັບ file ແລະ subfolder.
+> ຄ່າເລີ່ມຕົ້ນ (ບໍ່ໃສ່ `sharing`) ຄື private ຄືເກົ່າ.
 
 ### findAll / findById / find
 
@@ -373,10 +389,10 @@ drive.find({ type: "file" });
 // → { success: true, data: [ ... ] }
 ```
 
-### update — ແກ້ໄຂ metadata ເທົ່ານັ້ນ (name / description)
+### update — ແກ້ໄຂ metadata ເທົ່ານັ້ນ (name / description / sharing)
 
 ```javascript
-drive.update("fileId", { name: "renamed.pdf", description: "updated" });
+drive.update("fileId", { name: "renamed.pdf", description: "updated", sharing: "public" });
 ```
 
 ### delete — trash (ບໍ່ permanent, ເບິ່ງ [ADR-0001](docs/adr/0001-drive-delete-trashes-not-permanent.md))
@@ -395,7 +411,22 @@ drive.delete("fileId");
 drive.where("type", "=", "file").orderBy("name", "ASC").limit(10).get();
 ```
 
-> ເບິ່ງ [`CONTEXT.md`](CONTEXT.md) ສໍາລັບນິຍາມ `DriveFolder`, ແລະ `docs/adr/` ສໍາລັບເຫດຜົນເບື້ອງຫຼັງການອອກແບບ.
+### getImageUrl — URL ທີ່ໃຊ້ໃນ `<img src>` ໄດ້ຈິງ
+
+`record.url` (ຈາກ `findAll`/`insert`/ອື່ນໆ) ແມ່ນໜ້າ viewer ຂອງ Drive — **ໃຊ້ໃນ `<img src>` ບໍ່ໄດ້**
+(browser ຈະ block ຄືກັນກັບ opaque response). ໃຊ້ `getImageUrl()` ແທນ:
+
+```javascript
+const url = drive.getImageUrl(fileId);
+// → "https://lh3.googleusercontent.com/d/<fileId>"
+// throw plain Error ຖ້າ mimeType ບໍ່ແມ່ນ image/*
+```
+
+ບໍ່ກວດ/ຮັບປະກັນ sharing — ຕ້ອງໃສ່ `sharing: "public"` ຕອນ `insert()`/`update()` ນໍາ ຖ້າຢາກໃຫ້ຮູບ render
+ໃຫ້ຄົນອື່ນນອກຈາກເຈົ້າຂອງໄຟລ໌ເຫັນ. ເບິ່ງເຫດຜົນທີ່ໃຊ້ URL pattern ນີ້ (ບໍ່ແມ່ນ pattern ທາງການຂອງ Drive API) ໃນ
+[ADR-0003](docs/adr/0003-image-url-uses-undocumented-google-endpoint.md).
+
+> ເບິ່ງ [`CONTEXT.md`](CONTEXT.md) ສໍາລັບນິຍາມ `DriveFolder`/`Image URL`, ແລະ `docs/adr/` ສໍາລັບເຫດຜົນເບື້ອງຫຼັງການອອກແບບ.
 
 ---
 

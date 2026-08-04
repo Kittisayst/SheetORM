@@ -48,7 +48,12 @@ function runAllTests() {
     testDriveFind,
     testDriveUpdate,
     testDriveDelete,
-    testDriveWhereOrderByLimitSelect
+    testDriveWhereOrderByLimitSelect,
+    testGetImageUrl_Success,
+    testGetImageUrl_NotImage,
+    testInsertSharingPublic,
+    testUpdateSharingPublic,
+    testWhoAmI
   ];
 
   tests.forEach(function (fn) {
@@ -106,6 +111,10 @@ function clearDriveFolder() {
 
 function makeTestBlob(name) {
   return Utilities.newBlob("hello world", "text/plain", name || "test.txt");
+}
+
+function makeTestImageBlob(name) {
+  return Utilities.newBlob("fake image bytes", "image/png", name || "test.png");
 }
 
 // ===============================
@@ -721,4 +730,58 @@ function testDriveWhereOrderByLimitSelect() {
   assertEqual(result.data.length, 1, "limited to 1 result");
   assertEqual(result.data[0].name, "a.txt", "orderBy ASC picks a.txt first");
   assert(!result.data[0].mimeType, "select excludes mimeType");
+}
+
+// ===============================
+// 11. DriveFolder DX improvements
+// ===============================
+
+function testGetImageUrl_Success() {
+  clearDriveFolder();
+  var folder   = getDriveFolder();
+  var inserted = folder.insert({ blob: makeTestImageBlob("photo.png") });
+
+  var url = folder.getImageUrl(inserted.data.id);
+  assertEqual(url, "https://lh3.googleusercontent.com/d/" + inserted.data.id, "image url format");
+}
+
+function testGetImageUrl_NotImage() {
+  clearDriveFolder();
+  var folder   = getDriveFolder();
+  var inserted = folder.insert({ blob: makeTestBlob("not-an-image.txt") });
+
+  var threw = false;
+  try {
+    folder.getImageUrl(inserted.data.id);
+  } catch (e) {
+    threw = true;
+  }
+  assert(threw, "getImageUrl should throw for a non-image file");
+}
+
+function testInsertSharingPublic() {
+  clearDriveFolder();
+  var folder   = getDriveFolder();
+  var inserted = folder.insert({ blob: makeTestBlob("public.txt"), sharing: "public" });
+
+  var file = DriveApp.getFileById(inserted.data.id);
+  assertEqual(file.getSharingAccess().toString(), DriveApp.Access.ANYONE.toString(), "sharing access");
+  assertEqual(file.getSharingPermission().toString(), DriveApp.Permission.VIEW.toString(), "sharing permission");
+}
+
+function testUpdateSharingPublic() {
+  clearDriveFolder();
+  var folder   = getDriveFolder();
+  var inserted = folder.insert({ blob: makeTestBlob("private.txt") });
+
+  var result = folder.update(inserted.data.id, { sharing: "public" });
+  assert(result.success, "update with sharing should succeed");
+
+  var file = DriveApp.getFileById(inserted.data.id);
+  assertEqual(file.getSharingAccess().toString(), DriveApp.Access.ANYONE.toString(), "sharing access after update");
+}
+
+function testWhoAmI() {
+  var email = SheetORM.whoAmI();
+  assert(typeof email === "string" && email.indexOf("@") !== -1, "whoAmI should return an email string");
 }

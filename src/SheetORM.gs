@@ -7,9 +7,17 @@ function driveConnect(folderId) {
   try {
     folder = DriveApp.getFolderById(folderId);
   } catch (e) {
-    throw new ConnectionError("Cannot open Drive folder: " + folderId);
+    throw new ConnectionError(
+      "Cannot open Drive folder: " + folderId +
+      ". Check the folder ID is correct and that the running account has access — " +
+      "see SheetORM.whoAmI() to check which account is executing."
+    );
   }
   return new DriveFolder(folder);
+}
+
+function whoAmI() {
+  return Session.getEffectiveUser().getEmail();
 }
 
 function migrate(spreadsheetId, migrations) {

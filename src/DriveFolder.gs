@@ -117,6 +117,8 @@ DriveFolder.prototype.insert = function (data) {
       throw new Error("insert requires blob or name");
     }
 
+    this._applySharing(item, data.sharing);
+
     return { success: true, data: this._toRecord(item, type) };
   } catch (e) {
     return errResponse(e);
@@ -131,6 +133,7 @@ DriveFolder.prototype.update = function (id, data) {
 
     if (data.name !== undefined) item.setName(data.name);
     if (data.description !== undefined) item.setDescription(data.description);
+    this._applySharing(item, data.sharing);
 
     return { success: true, data: this._toRecord(item, resolved.type) };
   } catch (e) {
@@ -146,6 +149,24 @@ DriveFolder.prototype.delete = function (id) {
     return { success: true, data: { id: id } };
   } catch (e) {
     return errResponse(e);
+  }
+};
+
+// --- IMAGE URL: browser-embeddable <img src> URL for an image file (ADR-0003) ---
+// ບໍ່ຄືນ {success,data} ຄືກັນກັບ method ອື່ນ — ນີ້ຄື synchronous string builder, ບໍ່ແມ່ນ CRUD operation
+DriveFolder.prototype.getImageUrl = function (fileId) {
+  var resolved = this._resolveItem(fileId);
+  var mimeType = resolved.item.getMimeType();
+  if (mimeType.indexOf("image/") !== 0) {
+    throw new Error("File is not an image (mimeType: " + mimeType + "): " + fileId);
+  }
+  return "https://lh3.googleusercontent.com/d/" + fileId;
+};
+
+// --- SHARING: ຕັ້ງ item ໃຫ້ເປັນ "public" (ANYONE + VIEW) — ໃຊ້ຮ່ວມກັນລະຫວ່າງ insert()/update() ---
+DriveFolder.prototype._applySharing = function (item, sharing) {
+  if (sharing === "public") {
+    item.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
   }
 };
 

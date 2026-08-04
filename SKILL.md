@@ -37,6 +37,10 @@ SheetORM is a Google Apps Script library that wraps Google Sheets as a database 
       }
     ]
   },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+  ],
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
   "webapp": {
@@ -49,6 +53,12 @@ SheetORM is a Google Apps Script library that wraps Google Sheets as a database 
 > - `userSymbol` ຕ້ອງເປັນ `"SheetORM"` — ຈຶ່ງໃຊ້ `SheetORM.connect()` ໄດ້
 > - `libraryId` = Script ID ຂອງ SheetORM project (ຫາໄດ້ຈາກ Project Settings ⚙️)
 > - `developmentMode: true` = ໃຊ້ HEAD version (ສຳລັບ dev), `false` = ໃຊ້ version ທີ່ລະບຸ
+> - ເບິ່ງ `CHANGELOG.md` ວ່າ feature ທີ່ຕ້ອງການມາຈາກ version ໃດ
+> - **`oauthScopes` ຕ້ອງໃສ່ເອງໃນ manifest ຂອງ consumer project** — Apps Script scan scope ອັດຕະໂນມັດ
+>   ບໍ່ເຫັນການເອີ້ນໃຊ້ `DriveApp`/`SpreadsheetApp` ທີ່ຢູ່ພາຍໃນ library code (scan ເຫັນສະເພາະ code
+>   ຂອງ consumer project ເອງ), ຖ້າໃຊ້ `driveConnect()`/`DriveFolder` ຕ້ອງມີ `.../auth/drive` (scope
+>   ເຕັມ, ບໍ່ພຽງພໍຖ້າໃຊ້ `.../auth/drive.file` ເພາະ `findAll`/`findById` ຕ້ອງອ່ານໄຟລ໌ທີ່ບໍ່ໄດ້ຖືກສ້າງໂດຍ
+>   script ນີ້ເອງນໍາ) — ຖ້າໃຊ້ແຕ່ `connect()`/`Table` ໃຊ້ພຽງ `.../auth/spreadsheets` ພຽງພໍ
 
 ### 2. ຕັ້ງຄ່າ `.clasp.json` ສຳລັບ push code
 
@@ -349,16 +359,44 @@ recurse into subfolders.
 ```javascript
 const drive = SheetORM.driveConnect("FOLDER_ID");
 
-drive.insert({ blob: someBlob, name: "report.pdf" });  // upload file
-drive.insert({ name: "2026-06" });                     // create subfolder
+drive.insert({ blob: someBlob, name: "report.pdf" });                        // upload file
+drive.insert({ blob: imageBlob, name: "room.jpg", sharing: "public" });      // public-shareable image
+drive.insert({ name: "2026-06" });                                          // create subfolder
 
 drive.findAll();                 // → files + subfolders, one level deep, each tagged type: "file"|"folder"
 drive.findById(id);
 drive.find({ type: "file" });
-drive.update(id, { name: "renamed.pdf", description: "..." });  // metadata only
+drive.update(id, { name: "renamed.pdf", description: "...", sharing: "public" });  // metadata only
 drive.delete(id);                // trash, not permanent
 
 drive.where("type", "=", "file").orderBy("name", "ASC").limit(10).get();  // same Query builder as Table
+```
+
+### Image URL — `<img src>`-safe URL for an image file
+
+`record.url` (from `findAll`/`insert`/etc.) is Drive's viewer-page link — it does **not** work as an
+`<img src>`. Use `getImageUrl()` instead:
+
+```javascript
+const url = drive.getImageUrl(fileId);
+// → "https://lh3.googleusercontent.com/d/<fileId>"
+// throws a plain Error if the file's mimeType isn't image/*
+```
+
+`getImageUrl()` does not check or guarantee sharing — pair it with `sharing: "public"` on `insert()`/
+`update()` if the image needs to render for viewers other than the file's owner. See
+[`docs/adr/0003-image-url-uses-undocumented-google-endpoint.md`](docs/adr/0003-image-url-uses-undocumented-google-endpoint.md)
+for why this URL format (not a documented Drive API pattern) was chosen.
+
+### Debugging `ConnectionError` on `driveConnect()`
+
+A bad folder ID and "the account running this script has no access to that folder" throw the same
+`ConnectionError` — Drive doesn't reliably distinguish the two. Use `SheetORM.whoAmI()` to check which
+Google account the script is actually executing as (e.g. compare it against the account that owns the
+Drive folder):
+
+```javascript
+SheetORM.whoAmI();  // → "someone@example.com"
 ```
 
 No `.schema()`, no `insertMany()`, no Migrator/Seeder support for Drive in v1. `replaceContent()`,
