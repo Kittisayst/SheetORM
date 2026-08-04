@@ -1,3 +1,8 @@
+---
+name: sheetorm
+description: Google Apps Script library that wraps Google Sheets/Drive as an ORM-style database — CRUD, query builder, schema validation, migrations, seeding.
+---
+
 # SKILL: SheetORM
 
 - **Repository:** https://github.com/Kittisayst/SheetORM
