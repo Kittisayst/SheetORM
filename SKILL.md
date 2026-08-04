@@ -9,7 +9,7 @@ SheetORM is a Google Apps Script library that wraps Google Sheets as a database 
 - Each **Sheet tab** = a table
 - **Row 1** = column headers (field names)
 - Fields `id`, `createdAt`, `updatedAt` are auto-managed
-- Also wraps a Google Drive folder as a file/subfolder collection via `SheetORM.driveConnect(folderId)` — see [Drive Folder](#drive-folder)
+- Also wraps a Google Drive folder as a file/subfolder collection via `SheetORM.driveConnect(folderId)` — see the "Drive Folder" section below
 
 ---
 
