@@ -9,6 +9,7 @@ SheetORM is a Google Apps Script library that wraps Google Sheets as a database 
 - Each **Sheet tab** = a table
 - **Row 1** = column headers (field names)
 - Fields `id`, `createdAt`, `updatedAt` are auto-managed
+- Also wraps a Google Drive folder as a file/subfolder collection via `SheetORM.driveConnect(folderId)` — see [Drive Folder](#drive-folder)
 
 ---
 
@@ -291,10 +292,10 @@ Every method returns the same shape:
 ## Error Types
 | type | trigger |
 |------|---------|
-| `NotFoundError` | `findById`, `update`, `delete` with unknown id |
-| `ValidationError` | `insert` / `update` fails schema rules |
-| `ConnectionError` | wrong Spreadsheet ID or no access |
-| `Error` | unexpected runtime error |
+| `NotFoundError` | `findById`, `update`, `delete` with unknown id — also `DriveFolder` methods when the id isn't a direct child of the connected folder |
+| `ValidationError` | `insert` / `update` fails schema rules (`Table` only — `DriveFolder` has no schema) |
+| `ConnectionError` | wrong Spreadsheet/Drive folder ID or no access |
+| `Error` | unexpected runtime error — also `DriveFolder.insert()` when neither `blob` nor `name` is given |
 
 ---
 
@@ -333,9 +334,36 @@ function safeDelete(id) {
 
 ---
 
+## Drive Folder
+
+Manage files/subfolders in one Google Drive folder, connected directly by `folderId` (no `Connection`/
+`.table()` indirection — one folder = one collection). See `CONTEXT.md` for the `DriveFolder` glossary
+entry and `docs/adr/` for why `delete()` trashes instead of permanently deleting, and why listings never
+recurse into subfolders.
+
+```javascript
+const drive = SheetORM.driveConnect("FOLDER_ID");
+
+drive.insert({ blob: someBlob, name: "report.pdf" });  // upload file
+drive.insert({ name: "2026-06" });                     // create subfolder
+
+drive.findAll();                 // → files + subfolders, one level deep, each tagged type: "file"|"folder"
+drive.findById(id);
+drive.find({ type: "file" });
+drive.update(id, { name: "renamed.pdf", description: "..." });  // metadata only
+drive.delete(id);                // trash, not permanent
+
+drive.where("type", "=", "file").orderBy("name", "ASC").limit(10).get();  // same Query builder as Table
+```
+
+No `.schema()`, no `insertMany()`, no Migrator/Seeder support for Drive in v1. `replaceContent()`,
+`moveTo()`, and `permanentDelete()` are deferred to v2.
+
+---
+
 ## File Load Order (Apps Script)
 ```
 Errors.gs → Utils.gs → Validator.gs → Connection.gs →
-Table.gs → Query.gs → Migrator.gs → Seeder.gs → SheetORM.gs
+Table.gs → Query.gs → Migrator.gs → Seeder.gs → DriveFolder.gs → SheetORM.gs
 ```
 Rename with `01_`, `02_`... prefix if alphabetical order is wrong.

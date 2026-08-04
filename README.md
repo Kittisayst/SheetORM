@@ -14,6 +14,7 @@ Google Apps Script library ສໍາລັບຈັດການ Google Sheets �
 - [Batch Operations](#batch-operations)
 - [Migration](#migration)
 - [Seeder](#seeder)
+- [Drive Folder](#drive-folder)
 - [Error Types](#error-types)
 - [Response Format](#response-format)
 - [File Structure](#file-structure)
@@ -337,6 +338,67 @@ SheetORM.freshSeed(SPREADSHEET_ID, seeds);
 
 ---
 
+## Drive Folder
+
+ຈັດການໄຟລ໌ ແລະ subfolder ພາຍໃນ Google Drive folder ໜຶ່ງ ຜ່ານ `folderId` — ຄ້າຍກັນກັບ `table()` ແຕ່ສໍາລັບ
+Drive. ບໍ່ຕ້ອງ `.schema()`, ບໍ່ຮອງຮັບ query ນອກ folder ນັ້ນ (ໜຶ່ງຊັ້ນ, ບໍ່ recurse ເຂົ້າ subfolder).
+
+```javascript
+const drive = SheetORM.driveConnect("FOLDER_ID");
+```
+
+### insert — upload ໄຟລ໌ ຫຼື ສ້າງ subfolder
+
+```javascript
+// upload file: ຕ້ອງມີ blob
+drive.insert({ blob: someBlob, name: "report.pdf", description: "Monthly report" });
+// → { success: true, data: { id, name: "report.pdf", type: "file", mimeType, size, url, ... } }
+
+// ສ້າງ subfolder: ບໍ່ມີ blob, ມີ name
+drive.insert({ name: "2026-06" });
+// → { success: true, data: { id, name: "2026-06", type: "folder", ... } }
+```
+
+### findAll / findById / find
+
+```javascript
+drive.findAll();
+// → { success: true, data: [ { type: "file", ... }, { type: "folder", ... } ] }
+
+drive.findById("fileOrFolderId");
+// → { success: true, data: {...} }
+// → { success: false, type: "NotFoundError", error: "Not found" } — ຖ້າບໍ່ພົບ ຫຼືບໍ່ແມ່ນ direct child
+
+drive.find({ type: "file" });
+// → { success: true, data: [ ... ] }
+```
+
+### update — ແກ້ໄຂ metadata ເທົ່ານັ້ນ (name / description)
+
+```javascript
+drive.update("fileId", { name: "renamed.pdf", description: "updated" });
+```
+
+### delete — trash (ບໍ່ permanent, ເບິ່ງ [ADR-0001](docs/adr/0001-drive-delete-trashes-not-permanent.md))
+
+```javascript
+drive.delete("fileId");
+// → { success: true, data: { id: "fileId" } } — ໄຟລ໌ຖືກຍ້າຍໄປຖັງຂີ້ເຫຍື້ອ, ຍັງກູ້ຄືນໄດ້
+```
+
+### Query builder
+
+ໃຊ້ `where()`/`orderBy()`/`limit()`/`offset()`/`select()` ຮ່ວມກັນກັບ `Table` (query ຢູ່ metadata fields
+ເຊັ່ນ `name`, `type`, `mimeType`, `createdAt`):
+
+```javascript
+drive.where("type", "=", "file").orderBy("name", "ASC").limit(10).get();
+```
+
+> ເບິ່ງ [`CONTEXT.md`](CONTEXT.md) ສໍາລັບນິຍາມ `DriveFolder`, ແລະ `docs/adr/` ສໍາລັບເຫດຜົນເບື້ອງຫຼັງການອອກແບບ.
+
+---
+
 ## Error Types
 
 ທຸກ error response ມີ field `type` ບອກ category:
@@ -382,10 +444,11 @@ src/
 ├── Validator.gs   schema validation + type casting
 ├── Connection.gs  connect to spreadsheet, select table
 ├── Table.gs       CRUD + schema() + where() + insertMany()
-├── Query.gs       query builder (where/orderBy/limit/offset/select/get/updateMany/deleteMany)
+├── Query.gs       query builder (where/orderBy/limit/offset/select/get/updateMany/deleteMany) — shared by Table and DriveFolder
 ├── Migrator.gs    schema management + version tracking
 ├── Seeder.gs      seed / freshSeed
-└── SheetORM.gs    main entry point
+├── DriveFolder.gs Drive folder CRUD (insert/findAll/findById/find/update/delete) + query() builder entry points
+└── SheetORM.gs    main entry point (connect, driveConnect, migrate, seed, ...)
 ```
 
-> **ລໍາດັບ load:** `Errors` → `Utils` → `Validator` → `Connection` → `Table` → `Query` → `Migrator` → `Seeder` → `SheetORM`
+> **ລໍາດັບ load:** `Errors` → `Utils` → `Validator` → `Connection` → `Table` → `Query` → `Migrator` → `Seeder` → `DriveFolder` → `SheetORM`

@@ -1,3 +1,4 @@
 src/.clasp.json
+test/.clasp.json
 .clasprc.json
 node_modules/

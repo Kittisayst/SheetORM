@@ -1,4 +1,5 @@
-var SPREADSHEET_ID = "YOUR_SPREADSHEET_ID";
+var SPREADSHEET_ID   = "YOUR_SPREADSHEET_ID";
+var DRIVE_FOLDER_ID  = "YOUR_DRIVE_FOLDER_ID";
 
 // ຮັນ test ທັງໝົດເທື່ອດຽວ
 function runAllTests() {
@@ -35,7 +36,19 @@ function runAllTests() {
     testLimitOnEmptyTable,
     testSelectDirectOnTable,
     testOrderByIsoDate,
-    testWhereIsoDateRange
+    testWhereIsoDateRange,
+    testDriveConnect_BadFolderId,
+    testDriveInsertFile,
+    testDriveInsertSubfolder,
+    testDriveFindAll,
+    testDriveFindById_File,
+    testDriveFindById_Folder,
+    testDriveFindById_NotFound,
+    testDriveFindById_OutOfScope,
+    testDriveFind,
+    testDriveUpdate,
+    testDriveDelete,
+    testDriveWhereOrderByLimitSelect
   ];
 
   tests.forEach(function (fn) {
@@ -74,6 +87,25 @@ function clearTable() {
   if (sheet && sheet.getLastRow() >= 2) {
     sheet.deleteRows(2, sheet.getLastRow() - 1);
   }
+}
+
+function getDriveFolder() {
+  return SheetORM.driveConnect(DRIVE_FOLDER_ID);
+}
+
+// trash ທຸກໄຟລ໌/subfolder ທີ່ຄ້າງຢູ່ໃນ test folder ຈາກ run ກ່ອນໜ້າ
+function clearDriveFolder() {
+  var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+
+  var files = folder.getFiles();
+  while (files.hasNext()) files.next().setTrashed(true);
+
+  var folders = folder.getFolders();
+  while (folders.hasNext()) folders.next().setTrashed(true);
+}
+
+function makeTestBlob(name) {
+  return Utilities.newBlob("hello world", "text/plain", name || "test.txt");
 }
 
 // ===============================
@@ -548,4 +580,145 @@ function testWhereIsoDateRange() {
   assert(result.success, "where ISO date > should succeed");
   assertEqual(result.data.length, 2, "should return 2 records after 2026-06-24");
   assert(result.data.every(function(r) { return r.name !== "Old"; }), "Old should be excluded");
+}
+
+// ===============================
+// 10. DriveFolder
+// ===============================
+
+function testDriveConnect_BadFolderId() {
+  var threw = false;
+  try {
+    SheetORM.driveConnect("not-a-real-folder-id");
+  } catch (e) {
+    threw = true;
+    assertEqual(e.type, "ConnectionError", "error type");
+  }
+  assert(threw, "driveConnect with bad folder id should throw ConnectionError");
+}
+
+function testDriveInsertFile() {
+  clearDriveFolder();
+  var folder = getDriveFolder();
+  var result = folder.insert({ blob: makeTestBlob("hello.txt"), description: "a test file" });
+
+  assert(result.success, "insert file should succeed");
+  assertEqual(result.data.type, "file", "record type");
+  assertEqual(result.data.name, "hello.txt", "file name");
+  assertEqual(result.data.description, "a test file", "file description");
+  assert(result.data.id, "file should have an id");
+}
+
+function testDriveInsertSubfolder() {
+  clearDriveFolder();
+  var folder = getDriveFolder();
+  var result = folder.insert({ name: "subfolder-a" });
+
+  assert(result.success, "insert subfolder should succeed");
+  assertEqual(result.data.type, "folder", "record type");
+  assertEqual(result.data.name, "subfolder-a", "subfolder name");
+}
+
+function testDriveFindAll() {
+  clearDriveFolder();
+  var folder = getDriveFolder();
+  folder.insert({ blob: makeTestBlob("a.txt") });
+  folder.insert({ name: "sub-b" });
+
+  var result = folder.findAll();
+  assert(result.success, "findAll should succeed");
+  assertEqual(result.data.length, 2, "findAll count");
+
+  var types = result.data.map(function (r) { return r.type; }).sort();
+  assertEqual(types.join(","), "file,folder", "findAll returns both file and folder types");
+}
+
+function testDriveFindById_File() {
+  clearDriveFolder();
+  var folder   = getDriveFolder();
+  var inserted = folder.insert({ blob: makeTestBlob("a.txt") });
+
+  var result = folder.findById(inserted.data.id);
+  assert(result.success, "findById file should succeed");
+  assertEqual(result.data.type, "file", "record type");
+}
+
+function testDriveFindById_Folder() {
+  clearDriveFolder();
+  var folder   = getDriveFolder();
+  var inserted = folder.insert({ name: "sub-c" });
+
+  var result = folder.findById(inserted.data.id);
+  assert(result.success, "findById subfolder should succeed");
+  assertEqual(result.data.type, "folder", "record type");
+}
+
+function testDriveFindById_NotFound() {
+  var result = getDriveFolder().findById("non-existent-id");
+  assert(!result.success, "findById should fail for unknown id");
+  assertEqual(result.type, "NotFoundError", "error type");
+}
+
+function testDriveFindById_OutOfScope() {
+  // ໄຟລ໌ SPREADSHEET_ID ບໍ່ໄດ້ຢູ່ພາຍໃນ DRIVE_FOLDER_ID → ຕ້ອງຖືກປະຕິບັດຄືກັນກັບບໍ່ພົບ
+  var result = getDriveFolder().findById(SPREADSHEET_ID);
+  assert(!result.success, "findById should fail for an id outside this folder's direct children");
+  assertEqual(result.type, "NotFoundError", "error type");
+}
+
+function testDriveFind() {
+  clearDriveFolder();
+  var folder = getDriveFolder();
+  folder.insert({ blob: makeTestBlob("a.txt") });
+  folder.insert({ blob: makeTestBlob("b.txt") });
+  folder.insert({ name: "sub-d" });
+
+  var result = folder.find({ type: "file" });
+  assert(result.success, "find should succeed");
+  assertEqual(result.data.length, 2, "find file-type count");
+}
+
+function testDriveUpdate() {
+  clearDriveFolder();
+  var folder   = getDriveFolder();
+  var inserted = folder.insert({ blob: makeTestBlob("old-name.txt") });
+
+  var result = folder.update(inserted.data.id, { name: "new-name.txt", description: "renamed" });
+  assert(result.success, "update should succeed");
+  assertEqual(result.data.name, "new-name.txt", "updated name");
+  assertEqual(result.data.description, "renamed", "updated description");
+}
+
+function testDriveDelete() {
+  clearDriveFolder();
+  var folder   = getDriveFolder();
+  var inserted = folder.insert({ blob: makeTestBlob("to-delete.txt") });
+  var id       = inserted.data.id;
+
+  var result = folder.delete(id);
+  assert(result.success, "delete should succeed");
+  assertEqual(result.data.id, id, "deleted id");
+  assert(DriveApp.getFileById(id).isTrashed(), "file should be trashed, not gone");
+
+  var all = folder.findAll();
+  assert(all.data.every(function (r) { return r.id !== id; }), "trashed file excluded from findAll");
+}
+
+function testDriveWhereOrderByLimitSelect() {
+  clearDriveFolder();
+  var folder = getDriveFolder();
+  folder.insert({ blob: makeTestBlob("a.txt") });
+  folder.insert({ blob: makeTestBlob("b.txt") });
+  folder.insert({ name: "sub-e" });
+
+  var result = folder.where("type", "=", "file")
+    .orderBy("name", "ASC")
+    .limit(1)
+    .select(["id", "name", "type"])
+    .get();
+
+  assert(result.success, "where/orderBy/limit/select should succeed");
+  assertEqual(result.data.length, 1, "limited to 1 result");
+  assertEqual(result.data[0].name, "a.txt", "orderBy ASC picks a.txt first");
+  assert(!result.data[0].mimeType, "select excludes mimeType");
 }

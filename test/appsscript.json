@@ -1,0 +1,15 @@
+{
+  "timeZone": "Asia/Bangkok",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "SheetORM",
+        "libraryId": "1uzi-fDzpvNMELD0ozluLRhzls_UbaJw_frjMlEjP40FTBZC0dfXV-In_",
+        "version": "3",
+        "developmentMode": true
+      }
+    ]
+  }
+}
